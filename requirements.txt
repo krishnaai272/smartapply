@@ -1,0 +1,14 @@
+streamlit
+langchain
+langchain-community
+torch
+transformers
+accelerate
+bitsandbytes
+sentencepiece
+pypdf
+python-docx
+openai-whisper
+streamlit-webrtc
+python-dotenv
+fpdf2

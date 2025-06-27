@@ -3,14 +3,3 @@ pypdf
 python-docx
 fpdf2
 requests
-fastapi
-uvicorn
-python-dotenv
-torch
-transformers
-accelerate
-bitsandbytes
-sentencepiece
-langchain
-langchain-community
-pydantic

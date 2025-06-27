@@ -3,3 +3,4 @@ pypdf
 python-docx
 fpdf2
 requests
+streamlit-webrtc

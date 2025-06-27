@@ -4,8 +4,41 @@ import queue
 
 from src.parser import parse_resume
 from src.llm import load_model, generate_all
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 from src.pdf_generator import create_downloadable_pdf
 # from src.audio import transcribe_audio # Whisper can be heavy, enable if you have the resources
+
+class GenerationRequest(BaseModel):
+    resume_text: str
+    job_description: str
+    user_notes: str = ""
+
+app = FastAPI(title="SmartApply AI Backend")
+llm = None
+
+@app.on_event("startup")
+def startup_event():
+    global llm
+    print("--> Loading the AI model...")
+    llm = load_model()
+    print("--> AI Model Loaded Successfully!")
+
+@app.post("/generate")
+def generate_application_endpoint(request: GenerationRequest):
+    if llm is None:
+        raise HTTPException(status_code=503, detail="Model is not ready.")
+    
+    try:
+        result = generate_all(
+            llm=llm,
+            resume_text=request.resume_text,
+            job_description=request.job_description,
+            user_notes=request.user_notes
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(

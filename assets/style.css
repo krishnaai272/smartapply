@@ -69,3 +69,22 @@ h1, h2, h3 {
     color: #ffffff;
     font-weight: 700;
 }
+/* Add this new rule */
+.stApp, .stApp div, .stApp p, .stApp li {
+    color: #FFFFFF;
+}
+
+/* --- Keep all your other styles below --- */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+body {
+    background-color: #1a0c3b !important; /* Deep purple background */
+}
+
+/* Main App styling */
+.stApp {
+    background-image: linear-gradient(135deg, #4d1d9a 0%, #1a0c3b 80%);
+    background-attachment: fixed;
+    font-family: 'Inter', sans-serif;
+}
+/* ... rest of your CSS ... */

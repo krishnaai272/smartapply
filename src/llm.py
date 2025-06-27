@@ -1,40 +1,93 @@
-import requests
-import streamlit as st
+import torch
+from transformers import pipeline, BitsAndBytesConfig
+from langchain_community.llms.huggingface_pipeline import HuggingFacePipeline
+from langchain.chains import LLMChain
+from dotenv import load_dotenv
+import os
+import re
 
-def generate_all(resume_text, job_description, user_notes):
+from src.prompts import RESUME_REWRITE_PROMPT, COVER_LETTER_PROMPT, SCORING_PROMPT
+
+# Load environment variables
+load_dotenv()
+MODEL_NAME = os.getenv("MODEL_NAME")
+
+def load_model():
     """
-    Calls the backend API to generate the application content.
+    Loads the quantized language model from HuggingFace.
     """
-    # Get the backend URL from Streamlit's secrets
-    # The key 'HF_SPACE_URL' should match what you set in Streamlit Cloud
-    API_URL = st.secrets.get("HF_SPACE_URL")
+    # Configuration for 4-bit quantization for efficient model loading
+    bnb_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16,
+        bnb_4bit_use_double_quant=False,
+    )
 
-    if not API_URL:
-        st.error("Backend API URL is not configured. Please set the HF_SPACE_URL secret in your Streamlit app settings.")
-        return None
+    # Initialize the text generation pipeline
+    text_generation_pipeline = pipeline(
+        "text-generation",
+        model=MODEL_NAME,
+        torch_dtype=torch.bfloat16,
+        quantization_config=bnb_config,
+        device_map="auto", # Automatically use GPU if available
+        max_new_tokens=2048,
+        do_sample=True,
+        top_k=10,
+        num_return_sequences=1,
+        eos_token_id=-1, # Avoids model stopping prematurely
+    )
 
-    # The full endpoint URL for the generation function
-    endpoint = f"{API_URL}/generate"
+    llm = HuggingFacePipeline(pipeline=text_generation_pipeline)
+    return llm
+
+def generate_all(llm, resume_text, job_description, user_notes):
+    """
+    Generates the tailored resume, cover letter, and score using the LLM.
+    """
+    # 1. Generate Tailored Resume
+    resume_chain = LLMChain(llm=llm, prompt=RESUME_REWRITE_PROMPT)
+    tailored_resume = resume_chain.run(
+        resume_text=resume_text,
+        job_description=job_description
+    )
+
+    # 2. Generate Cover Letter
+    cover_letter_chain = LLMChain(llm=llm, prompt=COVER_LETTER_PROMPT)
+    cover_letter = cover_letter_chain.run(
+        tailored_resume=tailored_resume,
+        job_description=job_description,
+        user_notes=user_notes if user_notes else "No specific notes provided."
+    )
+
+    # 3. Generate Score and Analysis
+    scoring_chain = LLMChain(llm=llm, prompt=SCORING_PROMPT)
+    score_analysis_text = scoring_chain.run(
+        resume_text=tailored_resume,
+        job_description=job_description
+    )
+
+    # Parse the score and analysis from the raw text
+    score, analysis = parse_score_and_analysis(score_analysis_text)
     
-    payload = {
-        "resume_text": resume_text,
-        "job_description": job_description,
-        "user_notes": user_notes
+    return {
+        "tailored_resume": tailored_resume,
+        "cover_letter": cover_letter,
+        "score": score,
+        "analysis": analysis,
     }
 
+def parse_score_and_analysis(text):
+    """
+    Parses the score and analysis from the LLM's raw output string.
+    """
     try:
-        # Make the API call with a generous timeout for the AI model
-        response = requests.post(endpoint, json=payload, timeout=300) # 5-minute timeout
+        score_match = re.search(r"Score:\s*(\d+)", text, re.IGNORECASE)
+        score = int(score_match.group(1)) if score_match else 75 # Default score
 
-        # Check for HTTP errors (like 404, 500, etc.)
-        response.raise_for_status() 
+        analysis_match = re.search(r"Analysis:\s*(.*)", text, re.IGNORECASE | re.DOTALL)
+        analysis = analysis_match.group(1).strip() if analysis_match else "Could not parse analysis."
 
-        # Return the JSON data from the successful response
-        return response.json()
-
-    except requests.exceptions.RequestException as e:
-        st.error(f"Failed to connect to the AI backend: {e}")
-        return None
-    except Exception as e:
-        st.error(f"An unknown error occurred while communicating with the backend: {e}")
-        return None
+        return score, analysis
+    except Exception:
+        return 75, "Analysis could not be extracted from the model's response."

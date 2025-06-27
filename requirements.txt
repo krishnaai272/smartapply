@@ -1,6 +1,13 @@
 streamlit
+langchain
+langchain-community
+torch
+transformers
+accelerate
+bitsandbytes
+sentencepiece
 pypdf
 python-docx
 fpdf2
-requests
-streamlit-webrtc
+python-dotenv
+streamlit-webrtc 

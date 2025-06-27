@@ -3,7 +3,7 @@ from streamlit_webrtc import webrtc_streamer, WebRtcMode
 import queue
 
 from src.parser import parse_resume
-from src.llm import generate_all
+from src.llm import load_model, generate_all
 from src.pdf_generator import create_downloadable_pdf
 # from src.audio import transcribe_audio # Whisper can be heavy, enable if you have the resources
 
@@ -82,14 +82,17 @@ if st.session_state.resume_text:
                 st.warning("Please paste the job description to proceed.")
             else:
                 # Load model on first use
-                
+                if st.session_state.llm is None:
+                    with st.spinner("Warming up the AI... This might take a moment."):
+                        st.session_state.llm = load_model()
                 
                 with st.spinner("AI is crafting your tailored application... This can take 1-2 minutes."):
-                 st.session_state.generated_content = generate_all(
-                   resume_text=st.session_state.resume_text,
-                   job_description=job_description,
-                   user_notes="" # user_notes
-                 )
+                    st.session_state.generated_content = generate_all(
+                        st.session_state.llm,
+                        st.session_state.resume_text,
+                        job_description,
+                        "" # user_notes
+                    )
 
 # --- STEP 3: DISPLAY RESULTS ---
 if st.session_state.generated_content:
